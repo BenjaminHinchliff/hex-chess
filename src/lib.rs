@@ -1,5 +1,15 @@
 use std::{collections::HashMap, fmt};
 
+fn reflect_q((q, r): &(i32, i32)) -> (i32, i32) {
+    (*q, -q - r)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MoveType {
+    Move,
+    Capture,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Name {
     Pawn { has_moved: bool },
@@ -13,6 +23,22 @@ pub enum Name {
 impl Name {
     pub const fn pawn() -> Name {
         Name::Pawn { has_moved: false }
+    }
+
+    pub fn verify_move(&self, (q1, r1): &(i32, i32), (q2, r2): &(i32, i32)) -> bool {
+        match self {
+            Name::Pawn { has_moved } => {
+                q1 == q2 && (r1 + 1 == *r2 || (!has_moved && r1 + 2 == *r2))
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    pub const fn moves(&self) -> &[(i32, i32)] {
+        match self {
+            Name::Pawn { has_moved } => &[(1, 0)],
+            _ => unimplemented!(),
+        }
     }
 }
 
@@ -45,6 +71,23 @@ impl Piece {
     pub const fn flip_team(mut self) -> Self {
         self.team = self.team.flip();
         self
+    }
+
+    pub fn verify_move(&self, f: &(i32, i32), t: &(i32, i32)) -> bool {
+        let mut f = *f;
+        let mut t = *t;
+        if let Team::White = self.team {
+            f = reflect_q(&f);
+            t = reflect_q(&t);
+        }
+
+        self.name.verify_move(&f, &t)
+    }
+
+    pub fn mark_moved(&mut self) {
+        if let Name::Pawn { has_moved } = &mut self.name {
+            *has_moved = true;
+        }
     }
 }
 
@@ -99,7 +142,7 @@ const STARTING_PIECES: &[Hex] = &[
 fn reflect_team(pieces: &[Hex]) -> impl Iterator<Item = Hex> + '_ {
     pieces
         .iter()
-        .map(|((q, r), p)| ((*q, -q - r), p.clone().flip_team()))
+        .map(|(p, piece)| (reflect_q(p), piece.clone().flip_team()))
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +159,16 @@ impl HexBoard {
         pieces.extend(reflect_team(STARTING_PIECES));
 
         HexBoard { pieces }
+    }
+
+    pub fn move_piece(&mut self, f: &(i32, i32), t: &(i32, i32)) {
+        let piece = self.pieces.get(f).unwrap();
+        if !piece.verify_move(f, t) {
+            panic!("help invalid move");
+        }
+        let mut piece = self.pieces.remove(f).unwrap();
+        piece.mark_moved();
+        self.pieces.insert(*t, piece);
     }
 }
 
@@ -140,10 +193,12 @@ impl fmt::Display for HexBoard {
         for row in 0..(2 * Self::N + 1) {
             write!(f, "{:1$}#", "", Self::N.abs_diff(row) as usize)?;
             for col in 0..(2 * Self::N + 1 - Self::N.abs_diff(row) as i32) {
-                match self
-                    .pieces
-                    .get(&(col + 0.max(Self::N - row) - Self::N, row - Self::N))
-                {
+                // convert cartesian to axial by adding when offset for initial rows
+                // then subtract radius to put (0, 0) in the center
+                let x = col + 0.max(Self::N - row) - Self::N;
+                let y = row - Self::N;
+
+                match self.pieces.get(&(x, y)) {
                     Some(p) => write!(f, " {}", p),
                     None => write!(f, " ."),
                 }?
@@ -155,15 +210,27 @@ impl fmt::Display for HexBoard {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     #[test]
-//     fn board_new() {
-//         let board = HexBoard::new();
+    #[test]
+    fn board_new() {
+        let board = HexBoard::new();
 
-//         println!("{}", board);
-//         panic!();
-//     }
-// }
+        println!("{}", board);
+    }
+
+    #[test]
+    fn board_move_pawn() {
+        let mut board = HexBoard::new();
+
+        board.move_piece(&(0, -1), &(0, 0));
+        assert_eq!(
+            board.pieces.get(&(0, 0)).cloned(),
+            Some(Piece::new(Name::Pawn { has_moved: true }, Team::Black)),
+            "state:\n{}",
+            board
+        );
+    }
+}

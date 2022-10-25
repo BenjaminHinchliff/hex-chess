@@ -1,13 +1,10 @@
+use crate::coord::Coord;
 use std::fmt;
 
-use glam::{IVec2, IVec3};
-
-use crate::coords_utils::reflect_q;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum MoveType {
-    Move,
-    Capture,
+pub struct MovesPossible {
+    pub _move: bool,
+    pub capture: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,11 +22,46 @@ impl Name {
         Name::Pawn { has_moved: false }
     }
 
-    pub fn verify_move(&self, f: IVec3, t: IVec3) -> bool {
+    fn verify_pawn(&self, has_moved: bool, f: Coord, t: Coord) -> Option<MovesPossible> {
+        // check trying to move one space forward, or two spaces forward
+        if f.q == t.q && (f.r + 1 == t.r || (!has_moved && f.r + 2 == t.r)) {
+            Some(MovesPossible {
+                _move: true,
+                capture: false,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn verify_bishop(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
+        if (t - f).norm_squared() % 3 == 0 {
+            Some(MovesPossible {
+                _move: true,
+                capture: true,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn verify_rook(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
+        if f.q == t.q || f.r == t.r || f.s() == t.s() {
+            Some(MovesPossible {
+                _move: true,
+                capture: true,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn verify_move(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
         match self {
-            Name::Pawn { has_moved } => {
-                f.x == t.x && (f.y + 1 == t.y || (!has_moved && f.y + 2 == t.y))
-            }
+            Name::Pawn { has_moved } => self.verify_pawn(*has_moved, f, t),
+            Name::Bishop => self.verify_bishop(f, t),
+            Name::Rook => self.verify_rook(f, t),
+            Name::Queen => self.verify_rook(f, t).or(self.verify_bishop(f, t)),
             _ => unimplemented!(),
         }
     }
@@ -73,10 +105,10 @@ impl Piece {
         self
     }
 
-    pub fn verify_move(&self, mut f: IVec3, mut t: IVec3) -> bool {
+    pub fn verify_move(&self, mut f: Coord, mut t: Coord) -> Option<MovesPossible> {
         if let Team::White = self.team {
-            f = reflect_q(f);
-            t = reflect_q(t);
+            f = f.reflect_q();
+            t = t.reflect_q();
         }
 
         self.name.verify_move(f, t)

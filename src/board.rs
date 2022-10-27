@@ -135,6 +135,9 @@ impl HexBoard {
         // if it can't capture and there is a piece there if can't work
         // if it can't move normally and there isn't a piece there then it can't work
         if (!possible.capture && self.pieces.contains_key(&to))
+            || (possible.capture
+                && self.pieces.contains_key(&to)
+                && self.pieces.get(&to).unwrap().team == piece.team)
             || (!possible._move && !self.pieces.contains_key(&to))
         {
             return Err(MoveError {
@@ -293,6 +296,22 @@ mod tests {
             },
         );
 
+        // cannot move diagonally
+        check_move_fails(
+            &mut board,
+            (-1, 1).into(),
+            (0, 1).into(),
+            Some(Piece::new(Name::Pawn { has_moved: true }, Team::Black)),
+            MoveError {
+                err_type: MoveErrorType::InvalidMove(Piece::new(
+                    Name::Pawn { has_moved: true },
+                    Team::Black,
+                )),
+                from: (-1, 1).into(),
+                to: (0, 1).into(),
+            },
+        );
+
         // move white (reflected over q axis)
         check_move(
             &mut board,
@@ -321,5 +340,66 @@ mod tests {
         check_move_sym(&mut board, (0, 0).into(), (1, 1).into(), bishop);
         check_move_sym(&mut board, (1, 1).into(), (3, -3).into(), bishop);
         check_move_sym(&mut board, (3, -3).into(), (1, -2).into(), bishop);
+
+        // invalid bishop moves fails
+        check_move_fails(
+            &mut board,
+            (1, -2).into(),
+            (1, 0).into(),
+            Some(bishop),
+            MoveError {
+                err_type: MoveErrorType::InvalidMove(bishop),
+                from: (1, -2).into(),
+                to: (1, 0).into(),
+            },
+        );
+    }
+
+    #[test]
+    fn move_knight() {
+        let mut board = HexBoard::new();
+        let knight = Piece::new(Name::Knight, Team::Black);
+        board.place((0, 0).into(), knight);
+
+        check_move_sym(&mut board.clone(), (0, 0).into(), (3, -1).into(), knight);
+
+        // knight cannot move in lines
+        check_move_fails(
+            &mut board,
+            (0, 0).into(),
+            (3, 0).into(),
+            Some(knight),
+            MoveError {
+                err_type: MoveErrorType::InvalidMove(knight),
+                from: (0, 0).into(),
+                to: (3, 0).into(),
+            },
+        )
+    }
+
+    #[test]
+    fn move_king() {
+        let mut board = HexBoard::new();
+        let king = Piece::new(Name::King, Team::Black);
+        board.place((0, 0).into(), king);
+
+        // bishop single
+        check_move_sym(&mut board.clone(), (0, 0).into(), (1, 1).into(), king);
+
+        // normal move
+        check_move_sym(&mut board.clone(), (0, 0).into(), (1, 0).into(), king);
+
+        // can't move by more than 1
+        check_move_fails(
+            &mut board.clone(),
+            (0, 0).into(),
+            (2, 0).into(),
+            Some(king),
+            MoveError {
+                err_type: MoveErrorType::InvalidMove(king),
+                from: (0, 0).into(),
+                to: (2, 0).into(),
+            },
+        );
     }
 }

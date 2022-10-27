@@ -29,6 +29,11 @@ impl Name {
                 _move: true,
                 capture: false,
             })
+        } else if (f.q + 1 == t.q && f.r == t.r) || (f.q == t.q && f.r + 1 == t.r) {
+            Some(MovesPossible {
+                _move: false,
+                capture: true,
+            })
         } else {
             None
         }
@@ -56,13 +61,38 @@ impl Name {
         }
     }
 
+    fn verify_knight(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
+        let v = t - f;
+        if (v.q * v.r * v.s()).abs() == 6 {
+            Some(MovesPossible {
+                _move: true,
+                capture: true,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn verify_king(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
+        let v = t - f;
+        if v.length() == 1 || (v.norm_squared() % 3 == 0 && v.norm_squared() / 3 == 1) {
+            Some(MovesPossible {
+                _move: true,
+                capture: true,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn verify_move(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
         match self {
             Name::Pawn { has_moved } => self.verify_pawn(*has_moved, f, t),
             Name::Bishop => self.verify_bishop(f, t),
             Name::Rook => self.verify_rook(f, t),
+            Name::Knight => self.verify_knight(f, t),
             Name::Queen => self.verify_rook(f, t).or(self.verify_bishop(f, t)),
-            _ => unimplemented!(),
+            Name::King => self.verify_king(f, t),
         }
     }
 
@@ -91,8 +121,8 @@ impl Team {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Piece {
-    name: Name,
-    team: Team,
+    pub name: Name,
+    pub team: Team,
 }
 
 impl Piece {

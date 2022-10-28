@@ -1,6 +1,6 @@
 use std::io::{self, BufRead, Write};
 
-use hex_chess::Game;
+use hex_chess_lib::Game;
 
 pub fn main() {
     let mut game = Game::new();

@@ -1,10 +1,8 @@
-use thiserror::Error;
-
 use crate::{
     coord::Coord,
     piece::{Name, Piece, Team},
 };
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, error::Error, fmt};
 
 type Hex = (Coord, Piece);
 
@@ -33,10 +31,10 @@ fn reflect_team<'a>(pieces: impl Iterator<Item = Hex> + 'a) -> impl Iterator<Ite
     pieces.map(|(p, piece)| (p.reflect_q(), piece.clone().flip_team()))
 }
 
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq)]
 pub enum MoveErrorType {
-    #[error("No Piece at starting position")]
-    NoPiece,
+    #[error("{0}")]
+    NoPiece(#[from] GetError),
     #[error("Invalid Move for {0}")]
     InvalidMove(Piece),
     #[error("{0} collided with on path")]
@@ -45,9 +43,9 @@ pub enum MoveErrorType {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MoveError {
-    err_type: MoveErrorType,
-    from: Coord,
-    to: Coord,
+    pub err_type: MoveErrorType,
+    pub from: Coord,
+    pub to: Coord,
 }
 
 impl fmt::Display for MoveError {
@@ -58,6 +56,18 @@ impl fmt::Display for MoveError {
             self.err_type, self.from, self.to
         )
     }
+}
+
+impl Error for MoveError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+}
+
+#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq)]
+pub enum GetError {
+    #[error("No Piece at position {0}")]
+    NoPiece(Coord),
 }
 
 #[derive(Debug, Clone)]
@@ -85,12 +95,13 @@ impl HexBoard {
         b
     }
 
+    #[allow(dead_code)]
     pub fn place(&mut self, c: Coord, piece: Piece) {
         self.pieces.insert(c, piece);
     }
 
-    pub fn get(&self, c: Coord) -> Option<&Piece> {
-        self.pieces.get(&c)
+    pub fn get(&self, c: Coord) -> Result<&Piece, GetError> {
+        self.pieces.get(&c).ok_or_else(|| GetError::NoPiece(c))
     }
 
     fn collides(&self, f: Coord, t: Coord) -> bool {
@@ -119,8 +130,8 @@ impl HexBoard {
     }
 
     pub fn move_piece(&mut self, from: Coord, to: Coord) -> Result<(), MoveError> {
-        let piece = self.pieces.get(&from).ok_or_else(|| MoveError {
-            err_type: MoveErrorType::NoPiece,
+        let piece = self.get(from).map_err(|e| MoveError {
+            err_type: e.into(),
             from,
             to,
         })?;
@@ -215,9 +226,9 @@ mod tests {
 
     // check that a move is valid and that the piece has the state expected
     fn check_move(board: &mut HexBoard, f: Coord, t: Coord, start_piece: Piece, end_piece: Piece) {
-        assert_eq!(board.get(f), Some(&start_piece), "state:\n{}", board);
+        assert_eq!(board.get(f), Ok(&start_piece), "state:\n{}", board);
         assert_eq!(board.move_piece(f, t), Ok(()));
-        assert_eq!(board.get(t), Some(&end_piece), "state:\n{}", board);
+        assert_eq!(board.get(t), Ok(&end_piece), "state:\n{}", board);
     }
 
     // check a move is valid for a piece with the same state before and after the move
@@ -233,7 +244,7 @@ mod tests {
         error: MoveError,
     ) {
         if let Some(piece) = piece {
-            assert_eq!(board.get(f), Some(&piece), "state:\n{}", board);
+            assert_eq!(board.get(f), Ok(&piece), "state:\n{}", board);
         }
         assert_eq!(board.move_piece(f, t), Err(error));
     }
@@ -247,7 +258,7 @@ mod tests {
             (1, 0).into(),
             None,
             MoveError {
-                err_type: MoveErrorType::NoPiece,
+                err_type: GetError::NoPiece((0, 0).into()).into(),
                 from: (0, 0).into(),
                 to: (1, 0).into(),
             },

@@ -119,6 +119,19 @@ impl Team {
     }
 }
 
+impl fmt::Display for Team {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Team::White => "white",
+                Team::Black => "black",
+            }
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Piece {
     pub name: Name,

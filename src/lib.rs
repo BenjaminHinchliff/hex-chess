@@ -1,5 +1,6 @@
 mod board;
 mod coord;
+mod game;
 mod piece;
 
-pub use board::HexBoard;
+pub use game::Game;

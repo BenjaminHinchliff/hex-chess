@@ -16,8 +16,8 @@ pub enum GameError {
 }
 
 pub struct Game {
-    turn: Team,
-    board: HexBoard,
+    pub turn: Team,
+    pub board: HexBoard,
 }
 
 impl Game {

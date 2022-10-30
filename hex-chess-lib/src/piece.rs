@@ -1,3 +1,5 @@
+use num_derive::ToPrimitive;
+
 use crate::coord::Coord;
 use std::fmt;
 
@@ -7,21 +9,17 @@ pub struct MovesPossible {
     pub capture: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToPrimitive)]
 pub enum Name {
-    Pawn { has_moved: bool },
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
     King,
+    Queen,
+    Bishop,
+    Knight,
+    Rook,
+    Pawn,
 }
 
 impl Name {
-    pub const fn pawn() -> Name {
-        Name::Pawn { has_moved: false }
-    }
-
     fn verify_pawn(&self, has_moved: bool, f: Coord, t: Coord) -> Option<MovesPossible> {
         // check trying to move one space forward, or two spaces forward
         if f.q == t.q && (f.r + 1 == t.r || (!has_moved && f.r + 2 == t.r)) {
@@ -85,9 +83,9 @@ impl Name {
         }
     }
 
-    pub fn verify_move(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
+    pub fn verify_move(&self, has_moved: bool, f: Coord, t: Coord) -> Option<MovesPossible> {
         match self {
-            Name::Pawn { has_moved } => self.verify_pawn(*has_moved, f, t),
+            Name::Pawn => self.verify_pawn(has_moved, f, t),
             Name::Bishop => self.verify_bishop(f, t),
             Name::Rook => self.verify_rook(f, t),
             Name::Knight => self.verify_knight(f, t),
@@ -104,7 +102,24 @@ impl Name {
     // }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Name::Pawn { .. } => "pawn",
+                Name::Bishop => "bishop",
+                Name::Rook => "rook",
+                Name::Knight => "knight",
+                Name::Queen => "queen",
+                Name::King => "king",
+            }
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToPrimitive)]
 pub enum Team {
     White,
     Black,
@@ -136,11 +151,16 @@ impl fmt::Display for Team {
 pub struct Piece {
     pub name: Name,
     pub team: Team,
+    pub has_moved: bool,
 }
 
 impl Piece {
     pub const fn new(name: Name, team: Team) -> Piece {
-        Piece { name, team }
+        Piece {
+            name,
+            team,
+            has_moved: false,
+        }
     }
 
     pub const fn flip_team(mut self) -> Self {
@@ -154,13 +174,11 @@ impl Piece {
             t = t.reflect_q();
         }
 
-        self.name.verify_move(f, t)
+        self.name.verify_move(self.has_moved, f, t)
     }
 
     pub fn mark_moved(&mut self) {
-        if let Name::Pawn { has_moved } = &mut self.name {
-            *has_moved = true;
-        }
+        self.has_moved = true;
     }
 }
 

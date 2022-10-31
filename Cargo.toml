@@ -1,7 +1,5 @@
 [workspace]
 
-default-members = ["hex-chess-bevy"]
-
 members = [
     "hex-chess-lib",
     "hex-chess-bevy"

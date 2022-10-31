@@ -9,17 +9,21 @@ pub struct MovesPossible {
     pub capture: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ToPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Name {
     King,
     Queen,
     Bishop,
     Knight,
     Rook,
-    Pawn,
+    Pawn { has_moved: bool },
 }
 
 impl Name {
+    pub const fn pawn() -> Name {
+        Name::Pawn { has_moved: false }
+    }
+
     fn verify_pawn(&self, has_moved: bool, f: Coord, t: Coord) -> Option<MovesPossible> {
         // check trying to move one space forward, or two spaces forward
         if f.q == t.q && (f.r + 1 == t.r || (!has_moved && f.r + 2 == t.r)) {
@@ -83,14 +87,25 @@ impl Name {
         }
     }
 
-    pub fn verify_move(&self, has_moved: bool, f: Coord, t: Coord) -> Option<MovesPossible> {
+    pub fn verify_move(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
         match self {
-            Name::Pawn => self.verify_pawn(has_moved, f, t),
+            Name::Pawn { has_moved } => self.verify_pawn(*has_moved, f, t),
             Name::Bishop => self.verify_bishop(f, t),
             Name::Rook => self.verify_rook(f, t),
             Name::Knight => self.verify_knight(f, t),
             Name::Queen => self.verify_rook(f, t).or(self.verify_bishop(f, t)),
             Name::King => self.verify_king(f, t),
+        }
+    }
+
+    pub const fn idx(&self) -> u8 {
+        match self {
+            Name::King => 0,
+            Name::Queen => 1,
+            Name::Bishop => 2,
+            Name::Knight => 3,
+            Name::Rook => 4,
+            Name::Pawn { .. } => 5,
         }
     }
 
@@ -151,16 +166,11 @@ impl fmt::Display for Team {
 pub struct Piece {
     pub name: Name,
     pub team: Team,
-    pub has_moved: bool,
 }
 
 impl Piece {
     pub const fn new(name: Name, team: Team) -> Piece {
-        Piece {
-            name,
-            team,
-            has_moved: false,
-        }
+        Piece { name, team }
     }
 
     pub const fn flip_team(mut self) -> Self {
@@ -174,11 +184,13 @@ impl Piece {
             t = t.reflect_q();
         }
 
-        self.name.verify_move(self.has_moved, f, t)
+        self.name.verify_move(f, t)
     }
 
     pub fn mark_moved(&mut self) {
-        self.has_moved = true;
+        if let Name::Pawn { has_moved } = &mut self.name {
+            *has_moved = true
+        }
     }
 }
 

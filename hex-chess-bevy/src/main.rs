@@ -78,7 +78,7 @@ fn setup(
             if let Ok(Piece { team, name, .. }) = game.board.get(coord) {
                 commands.spawn_bundle(SpriteSheetBundle {
                     sprite: TextureAtlasSprite {
-                        index: ATLAS_SIZE.0 * *team as usize + *name as usize,
+                        index: ATLAS_SIZE.0 * *team as usize + name.idx() as usize,
                         ..default()
                     },
                     texture_atlas: pieces_atlas_handle.clone(),

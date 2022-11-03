@@ -179,7 +179,7 @@ impl Piece {
     }
 
     pub fn verify_move(&self, mut f: Coord, mut t: Coord) -> Option<MovesPossible> {
-        if let Team::White = self.team {
+        if let Team::Black = self.team {
             f = f.reflect_q();
             t = t.reflect_q();
         }

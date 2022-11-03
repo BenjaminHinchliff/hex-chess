@@ -42,6 +42,12 @@ impl Game {
     }
 }
 
+impl Default for Game {
+    fn default() -> Self {
+        Game::new()
+    }
+}
+
 impl fmt::Display for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}'s turn", self.turn)?;
@@ -56,14 +62,19 @@ mod tests {
     #[test]
     fn moving_works() {
         let mut game = Game::new();
-        assert_eq!(game.move_piece((0, 1).into(), (0, 0).into()), Ok(()));
+        assert_eq!(
+            game.move_piece((0, -1).into(), (0, 0).into()),
+            Ok(()),
+            "{}",
+            game
+        );
     }
 
     #[test]
     fn unable_to_move_wrong_team() {
         let mut game = Game::new();
         assert_eq!(
-            game.move_piece((0, -1).into(), (0, 0).into()),
+            game.move_piece((0, 1).into(), (0, 0).into()),
             Err(GameError::TurnError {
                 given: Team::Black,
                 real: Team::White

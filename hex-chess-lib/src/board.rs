@@ -7,24 +7,24 @@ use std::{collections::HashMap, error::Error, fmt};
 type Hex = (Coord, Piece);
 
 const STARTING_PIECES: &[(Coord, Piece)] = &[
-    (Coord::new(0, -5), Piece::new(Name::Bishop, Team::Black)),
-    (Coord::new(0, -4), Piece::new(Name::Bishop, Team::Black)),
-    (Coord::new(0, -3), Piece::new(Name::Bishop, Team::Black)),
-    (Coord::new(1, -5), Piece::new(Name::King, Team::Black)),
-    (Coord::new(-1, -4), Piece::new(Name::Queen, Team::Black)),
-    (Coord::new(-2, -3), Piece::new(Name::Knight, Team::Black)),
-    (Coord::new(2, -5), Piece::new(Name::Knight, Team::Black)),
-    (Coord::new(-3, -2), Piece::new(Name::Rook, Team::Black)),
-    (Coord::new(3, -5), Piece::new(Name::Rook, Team::Black)),
-    (Coord::new(4, -5), Piece::new(Name::pawn(), Team::Black)),
-    (Coord::new(3, -4), Piece::new(Name::pawn(), Team::Black)),
-    (Coord::new(2, -3), Piece::new(Name::pawn(), Team::Black)),
-    (Coord::new(1, -2), Piece::new(Name::pawn(), Team::Black)),
-    (Coord::new(0, -1), Piece::new(Name::pawn(), Team::Black)),
-    (Coord::new(-1, -1), Piece::new(Name::pawn(), Team::Black)),
-    (Coord::new(-2, -1), Piece::new(Name::pawn(), Team::Black)),
-    (Coord::new(-3, -1), Piece::new(Name::pawn(), Team::Black)),
-    (Coord::new(-4, -1), Piece::new(Name::pawn(), Team::Black)),
+    (Coord::new(0, -5), Piece::new(Name::Bishop, Team::White)),
+    (Coord::new(0, -4), Piece::new(Name::Bishop, Team::White)),
+    (Coord::new(0, -3), Piece::new(Name::Bishop, Team::White)),
+    (Coord::new(1, -5), Piece::new(Name::King, Team::White)),
+    (Coord::new(-1, -4), Piece::new(Name::Queen, Team::White)),
+    (Coord::new(-2, -3), Piece::new(Name::Knight, Team::White)),
+    (Coord::new(2, -5), Piece::new(Name::Knight, Team::White)),
+    (Coord::new(-3, -2), Piece::new(Name::Rook, Team::White)),
+    (Coord::new(3, -5), Piece::new(Name::Rook, Team::White)),
+    (Coord::new(4, -5), Piece::new(Name::pawn(), Team::White)),
+    (Coord::new(3, -4), Piece::new(Name::pawn(), Team::White)),
+    (Coord::new(2, -3), Piece::new(Name::pawn(), Team::White)),
+    (Coord::new(1, -2), Piece::new(Name::pawn(), Team::White)),
+    (Coord::new(0, -1), Piece::new(Name::pawn(), Team::White)),
+    (Coord::new(-1, -1), Piece::new(Name::pawn(), Team::White)),
+    (Coord::new(-2, -1), Piece::new(Name::pawn(), Team::White)),
+    (Coord::new(-3, -1), Piece::new(Name::pawn(), Team::White)),
+    (Coord::new(-4, -1), Piece::new(Name::pawn(), Team::White)),
 ];
 
 fn reflect_team<'a>(pieces: impl Iterator<Item = Hex> + 'a) -> impl Iterator<Item = Hex> + 'a {
@@ -268,18 +268,18 @@ mod tests {
     #[test]
     fn move_pawn() {
         let mut board = HexBoard::new();
-        let pawn = Piece::new(Name::pawn(), Team::Black);
+        let pawn = Piece::new(Name::pawn(), Team::White);
         board.place((0, -2).into(), pawn.clone());
         board.place((-1, -1).into(), pawn);
-        board.place((1, 1).into(), Piece::new(Name::pawn(), Team::White));
+        board.place((1, 1).into(), Piece::new(Name::pawn(), Team::Black));
 
         // move one
         check_move(
             &mut board,
             (0, -2).into(),
             (0, -1).into(),
-            Piece::new(Name::pawn(), Team::Black),
-            Piece::new(Name::Pawn { has_moved: true }, Team::Black),
+            Piece::new(Name::pawn(), Team::White),
+            Piece::new(Name::Pawn { has_moved: true }, Team::White),
         );
 
         // move 2
@@ -287,8 +287,8 @@ mod tests {
             &mut board,
             (-1, -1).into(),
             (-1, 1).into(),
-            Piece::new(Name::pawn(), Team::Black),
-            Piece::new(Name::Pawn { has_moved: true }, Team::Black),
+            Piece::new(Name::pawn(), Team::White),
+            Piece::new(Name::Pawn { has_moved: true }, Team::White),
         );
 
         // move 3 fails
@@ -296,11 +296,11 @@ mod tests {
             &mut board,
             (-1, 1).into(),
             (-1, 3).into(),
-            Some(Piece::new(Name::Pawn { has_moved: true }, Team::Black)),
+            Some(Piece::new(Name::Pawn { has_moved: true }, Team::White)),
             MoveError {
                 err_type: MoveErrorType::InvalidMove(Piece::new(
                     Name::Pawn { has_moved: true },
-                    Team::Black,
+                    Team::White,
                 )),
                 from: (-1, 1).into(),
                 to: (-1, 3).into(),
@@ -312,24 +312,24 @@ mod tests {
             &mut board,
             (-1, 1).into(),
             (0, 1).into(),
-            Some(Piece::new(Name::Pawn { has_moved: true }, Team::Black)),
+            Some(Piece::new(Name::Pawn { has_moved: true }, Team::White)),
             MoveError {
                 err_type: MoveErrorType::InvalidMove(Piece::new(
                     Name::Pawn { has_moved: true },
-                    Team::Black,
+                    Team::White,
                 )),
                 from: (-1, 1).into(),
                 to: (0, 1).into(),
             },
         );
 
-        // move white (reflected over q axis)
+        // move black (reflected over q axis)
         check_move(
             &mut board,
             (1, 1).into(),
             (1, -1).into(),
-            Piece::new(Name::pawn(), Team::White),
-            Piece::new(Name::Pawn { has_moved: true }, Team::White),
+            Piece::new(Name::pawn(), Team::Black),
+            Piece::new(Name::Pawn { has_moved: true }, Team::Black),
         );
 
         // capture
@@ -337,8 +337,8 @@ mod tests {
             &mut board,
             (0, -1).into(),
             (1, -1).into(),
-            Piece::new(Name::Pawn { has_moved: true }, Team::Black),
-            Piece::new(Name::Pawn { has_moved: true }, Team::Black),
+            Piece::new(Name::Pawn { has_moved: true }, Team::White),
+            Piece::new(Name::Pawn { has_moved: true }, Team::White),
         )
     }
 

@@ -1,36 +1,14 @@
+mod hex_rect;
+
+use crate::hex_rect::{flat_hex_to_pixel, pixel_to_flat_hex};
 use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
     prelude::*,
     render::camera::RenderTarget,
-    sprite::MaterialMesh2dBundle,
+    sprite::{Material2d, MaterialMesh2dBundle, Mesh2dHandle},
+    utils::HashMap,
 };
-
 use hex_chess_lib::{Coord, Game, Piece};
-
-const SQRT_3: f32 = 1.7320508075688772;
-
-const LAYOUT_FLAT: Mat2 = Mat2::from_cols(Vec2::new(3. / 2., SQRT_3 / 2.), Vec2::new(0., SQRT_3));
-
-fn axial_round(v: Vec2) -> Coord {
-    let v = v.extend(-v.x - v.y);
-    let mut rv = v.round();
-    let dv = (rv - v).abs();
-    if dv.x > dv.y && dv.x > dv.z {
-        rv.x = -rv.y - rv.z;
-    } else if dv.y > dv.z {
-        rv.y = -rv.x - rv.z;
-    }
-    Coord::new(rv.x as i32, rv.y as i32)
-}
-
-fn flat_hex_to_pixel(hex: Coord, size: f32) -> Vec2 {
-    let hex = Vec2::new(hex.q as f32, hex.r as f32);
-    size * LAYOUT_FLAT * hex
-}
-
-fn pixel_to_flat_hex(hex: Vec2, size: f32) -> Coord {
-    axial_round(LAYOUT_FLAT.inverse() * hex / size)
-}
 
 const N: i32 = 5;
 const RADIUS: f32 = 50.0;
@@ -39,13 +17,83 @@ const ATLAS_SIZE: (usize, usize) = (6, 2);
 #[derive(Component)]
 struct MainCamera;
 
+type PieceSprites = HashMap<Coord, Entity>;
+
+struct HexMaterials {
+    mat_hover: Handle<ColorMaterial>,
+    mat_selected: Handle<ColorMaterial>,
+    mat_light: Handle<ColorMaterial>,
+    mat_mid: Handle<ColorMaterial>,
+    mat_dark: Handle<ColorMaterial>,
+}
+
+impl FromWorld for HexMaterials {
+    fn from_world(world: &mut World) -> Self {
+        let mut materials = world.get_resource_mut::<Assets<ColorMaterial>>().unwrap();
+        Self {
+            mat_hover: materials.add(ColorMaterial::from(Color::rgb(0.95, 0.51, 0.5))),
+            mat_selected: materials.add(ColorMaterial::from(Color::rgb(0.54, 0.2, 0.2))),
+            mat_light: materials.add(ColorMaterial::from(Color::rgb(1.0, 0.81, 0.62))),
+            mat_mid: materials.add(ColorMaterial::from(Color::rgb(0.82, 0.55, 0.27))),
+            mat_dark: materials.add(ColorMaterial::from(Color::rgb(0.91, 0.68, 0.44))),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct SelectedHex {
+    hover: Option<Coord>,
+    selected: Option<Coord>,
+}
+
+impl SelectedHex {
+    fn new() -> Self {
+        Self {
+            hover: None,
+            selected: None,
+        }
+    }
+}
+
+impl Default for SelectedHex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn color_tiles(
+    selected: Res<SelectedHex>,
+    hex_materials: Res<HexMaterials>,
+    mut tiles: Query<(&HexCoord, &mut Handle<ColorMaterial>)>,
+) {
+    for (HexCoord { coord }, mut material) in tiles.iter_mut() {
+        *material = if selected.selected.is_some() && selected.selected.unwrap() == *coord {
+            hex_materials.mat_selected.clone()
+        } else if selected.hover.is_some() && selected.hover.unwrap() == *coord {
+            hex_materials.mat_hover.clone()
+        } else if coord.norm_squared() % 3 == 0 {
+            hex_materials.mat_mid.clone()
+        } else if (*coord - (1, 0).into()).norm_squared() % 3 == 0 {
+            hex_materials.mat_dark.clone()
+        } else {
+            hex_materials.mat_light.clone()
+        };
+    }
+}
+
+#[derive(Debug, Clone, Component)]
+struct HexCoord {
+    coord: Coord,
+}
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    hex_materials: Res<HexMaterials>,
     asset_server: Res<AssetServer>,
     mut pieces_atlases: ResMut<Assets<TextureAtlas>>,
     game: Res<Game>,
+    mut piece_sprites: ResMut<PieceSprites>,
 ) {
     commands
         .spawn_bundle(Camera2dBundle::default())
@@ -60,6 +108,8 @@ fn setup(
     );
     let pieces_atlas_handle = pieces_atlases.add(pieces_atlas);
 
+    let hex_mesh = meshes.add(shape::RegularPolygon::new(RADIUS, 6).into());
+
     for q in -N..=N {
         let r1 = (-N).max(-q - N);
         let r2 = N.min(-q + N);
@@ -67,36 +117,32 @@ fn setup(
             let coord = Coord::new(q, r);
             let pixel = flat_hex_to_pixel(coord, RADIUS);
 
-            let color = if coord.norm_squared() % 3 == 0 {
-                Color::rgb(0.91, 0.68, 0.44)
-            } else if (coord - (1, 0).into()).norm_squared() % 3 == 0 {
-                Color::rgb(0.82, 0.55, 0.27)
-            } else {
-                Color::rgb(1.0, 0.81, 0.62)
-            };
-
             if let Ok(Piece { team, name, .. }) = game.board.get(coord) {
-                commands.spawn_bundle(SpriteSheetBundle {
-                    sprite: TextureAtlasSprite {
-                        index: ATLAS_SIZE.0 * *team as usize + name.idx() as usize,
+                let piece = commands
+                    .spawn_bundle(SpriteSheetBundle {
+                        sprite: TextureAtlasSprite {
+                            index: ATLAS_SIZE.0 * *team as usize + name.idx() as usize,
+                            ..default()
+                        },
+                        texture_atlas: pieces_atlas_handle.clone(),
+                        transform: Transform::from_translation(pixel.extend(1.0))
+                            .with_scale(Vec3::splat(0.8)),
                         ..default()
-                    },
-                    texture_atlas: pieces_atlas_handle.clone(),
-                    transform: Transform::from_translation(pixel.extend(1.0))
-                        .with_scale(Vec3::splat(0.8)),
-                    ..default()
-                });
+                    })
+                    .id();
+
+                piece_sprites.insert(coord, piece);
             }
 
-            commands.spawn_bundle(MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(shape::RegularPolygon::new(RADIUS, 6).into())
-                    .into(),
-                material: materials.add(ColorMaterial::from(color)),
-                transform: Transform::from_translation(pixel.extend(0.))
-                    .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_6)),
-                ..default()
-            });
+            commands
+                .spawn_bundle(MaterialMesh2dBundle {
+                    mesh: hex_mesh.clone().into(),
+                    material: hex_materials.mat_mid.clone(),
+                    transform: Transform::from_translation(pixel.extend(0.))
+                        .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_6)),
+                    ..default()
+                })
+                .insert(HexCoord { coord });
         }
     }
 }
@@ -117,6 +163,8 @@ fn piece_click_system(
     mut mouse_button_events: EventReader<MouseButtonInput>,
     wnds: Res<Windows>,
     q_camera: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+    game: Res<Game>,
+    mut select: ResMut<SelectedHex>,
 ) {
     let (camera, camera_transform) = q_camera.single();
 
@@ -126,26 +174,31 @@ fn piece_click_system(
         wnds.get_primary().unwrap()
     };
 
-    if !mouse_button_events.is_empty() {
-        if let Some(screen_pos) = wnd.cursor_position() {
-            let world_pos = screen_to_world(
-                screen_pos,
-                Vec2::new(wnd.width(), wnd.height()),
-                camera,
-                camera_transform,
-            );
-            let hex_pos = pixel_to_flat_hex(world_pos, RADIUS);
-            println!("{:?}", hex_pos);
+    if let Some(screen_pos) = wnd.cursor_position() {
+        let world_pos = screen_to_world(
+            screen_pos,
+            Vec2::new(wnd.width(), wnd.height()),
+            camera,
+            camera_transform,
+        );
+        let hex_pos = pixel_to_flat_hex(world_pos, RADIUS);
+
+        // set hovered tile
+        select.hover = Some(hex_pos);
+
+        for event in mouse_button_events.iter() {
+            if event.button == MouseButton::Left && event.state == ButtonState::Pressed {
+                if let Ok(piece) = game.board.get(hex_pos) {
+                    if piece.team == game.turn {
+                        select.selected = Some(hex_pos);
+                    }
+                }
+            }
         }
-    }
-    for event in mouse_button_events.iter() {
-        if event.button == MouseButton::Left && event.state == ButtonState::Pressed {}
     }
 }
 
 fn main() {
-    let game = Game::new();
-
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.89, 0.97, 1.0)))
         .insert_resource(WindowDescriptor {
@@ -154,9 +207,13 @@ fn main() {
             height: 1000.,
             ..default()
         })
-        .insert_resource(game)
         .add_plugins(DefaultPlugins)
+        .init_resource::<HexMaterials>()
+        .init_resource::<PieceSprites>()
+        .init_resource::<SelectedHex>()
+        .init_resource::<Game>()
         .add_startup_system(setup)
+        .add_system(color_tiles)
         .add_system(piece_click_system)
         .run();
 }

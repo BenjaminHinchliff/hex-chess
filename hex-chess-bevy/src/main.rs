@@ -1,5 +1,7 @@
 mod hex_rect;
 
+use std::time::Duration;
+
 use crate::hex_rect::{flat_hex_to_pixel, pixel_to_flat_hex};
 use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
@@ -8,6 +10,7 @@ use bevy::{
     sprite::MaterialMesh2dBundle,
     utils::HashMap,
 };
+use bevy_easings::{Ease, EaseFunction, EaseMethod, EasingType, EasingsPlugin};
 use hex_chess_lib::{Coord, Game};
 
 const N: i32 = 5;
@@ -122,15 +125,20 @@ fn setup(
 
             if let Ok(hex_chess_lib::Piece { team, name, .. }) = game.board.get(coord) {
                 let piece = commands
-                    .spawn_bundle(SpriteSheetBundle {
-                        sprite: TextureAtlasSprite {
-                            index: ATLAS_SIZE.0 * *team as usize + name.idx() as usize,
-                            ..default()
-                        },
-                        texture_atlas: pieces_atlas_handle.clone(),
-                        transform: Transform::from_translation(pixel.extend(1.0))
-                            .with_scale(Vec3::splat(0.8)),
+                    .spawn_bundle(SpatialBundle {
+                        transform: Transform::from_translation(pixel.extend(1.0)),
                         ..default()
+                    })
+                    .with_children(|parent| {
+                        parent.spawn_bundle(SpriteSheetBundle {
+                            sprite: TextureAtlasSprite {
+                                index: ATLAS_SIZE.0 * *team as usize + name.idx() as usize,
+                                ..default()
+                            },
+                            texture_atlas: pieces_atlas_handle.clone(),
+                            transform: Transform::from_scale(Vec3::splat(0.8)),
+                            ..default()
+                        });
                     })
                     .insert(Piece)
                     .id();
@@ -204,14 +212,24 @@ fn piece_click_system(
                         Ok(_) => {
                             // move the piece sprite
                             let entity = piece_sprites.remove(&from).unwrap();
-                            let mut transform = q_piece_transforms.get_mut(entity).unwrap();
+                            let transform = q_piece_transforms.get_mut(entity).unwrap();
                             // delete the captured piece if there is one
                             if let Some(_) = piece_sprites.get(&hex_pos) {
                                 let captured = piece_sprites.remove(&hex_pos).unwrap();
-                                commands.entity(captured).despawn();
+                                commands.entity(captured).despawn_recursive();
                             }
-                            transform.translation =
-                                flat_hex_to_pixel(hex_pos, RADIUS).extend(transform.translation.z);
+                            commands.entity(entity).insert(
+                                transform.ease_to(
+                                    Transform::from_translation(
+                                        flat_hex_to_pixel(hex_pos, RADIUS)
+                                            .extend(transform.translation.z),
+                                    ),
+                                    EaseMethod::EaseFunction(EaseFunction::QuadraticOut),
+                                    EasingType::Once {
+                                        duration: Duration::from_millis(200),
+                                    },
+                                ),
+                            );
                             piece_sprites.insert(hex_pos, entity);
 
                             select.selected = None;
@@ -234,6 +252,7 @@ fn main() {
             ..default()
         })
         .add_plugins(DefaultPlugins)
+        .add_plugin(EasingsPlugin)
         .init_resource::<HexMaterials>()
         .init_resource::<PieceSprites>()
         .init_resource::<SelectedHex>()

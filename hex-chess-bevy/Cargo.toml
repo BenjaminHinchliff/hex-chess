@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 hex-chess-lib = { path = "../hex-chess-lib" }
 bevy = { version = "0.8.1", features = ["wayland"] }
+bevy_easings = "0.8.1"
+# bevy_embedded_assets = "0.4.0"

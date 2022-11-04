@@ -31,7 +31,7 @@ impl Name {
                 _move: true,
                 capture: false,
             })
-        } else if (f.q + 1 == t.q && f.r == t.r) || (f.q == t.q && f.r + 1 == t.r) {
+        } else if (f.q + 1 == t.q && f.r == t.r) || (f.q - 1 == t.q && f.r + 1 == t.r) {
             Some(MovesPossible {
                 _move: false,
                 capture: true,
@@ -42,14 +42,27 @@ impl Name {
     }
 
     fn verify_bishop(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
-        if (t - f).norm_squared() % 3 == 0 {
-            Some(MovesPossible {
-                _move: true,
-                capture: true,
-            })
-        } else {
-            None
+        const MOVEMENTS: &[Coord] = &[
+            Coord::new(1, -2),
+            Coord::new(2, -1),
+            Coord::new(1, 1),
+            Coord::new(-1, 2),
+            Coord::new(-2, 1),
+            Coord::new(-1, -1),
+        ];
+        let v = t - f;
+        for m in MOVEMENTS {
+            let f = v / *m;
+            // check that the movement requested is a non-zero integer multiple of the movement
+            // vector
+            if f.q != 0 && f.r != 0 && f.q == f.r {
+                return Some(MovesPossible {
+                    _move: true,
+                    capture: true,
+                });
+            }
         }
+        None
     }
 
     fn verify_rook(&self, f: Coord, t: Coord) -> Option<MovesPossible> {

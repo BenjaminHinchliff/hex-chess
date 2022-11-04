@@ -114,7 +114,7 @@ impl HexBoard {
         } else {
             // bishops only collide with every other hex - maybe need to find
             // a better way to structure this
-            let axial_len = v.norm_squared() / 3;
+            let axial_len = ((v.norm_squared() / 3) as f32).sqrt() as i32;
             let uv = v / axial_len;
             (axial_len, uv)
         };
@@ -219,9 +219,7 @@ mod tests {
 
     #[test]
     fn new() {
-        let board = HexBoard::new();
-
-        println!("{}", board);
+        let _board = HexBoard::new();
     }
 
     // check that a move is valid and that the piece has the state expected

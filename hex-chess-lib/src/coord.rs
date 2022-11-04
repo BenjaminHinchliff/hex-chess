@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    ops::{Add, Div, Mul, Sub},
+    ops::{Add, Div, Mul, Rem, Sub},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -10,6 +10,8 @@ pub struct Coord {
 }
 
 impl Coord {
+    pub const ZERO: Coord = Coord::new(0, 0);
+
     pub const fn new(q: i32, r: i32) -> Self {
         Self { q, r }
     }

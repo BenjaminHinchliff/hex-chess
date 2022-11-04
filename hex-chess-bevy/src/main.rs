@@ -8,7 +8,7 @@ use bevy::{
     sprite::{Material2d, MaterialMesh2dBundle, Mesh2dHandle},
     utils::HashMap,
 };
-use hex_chess_lib::{Coord, Game, Piece};
+use hex_chess_lib::{Coord, Game};
 
 const N: i32 = 5;
 const RADIUS: f32 = 50.0;
@@ -86,6 +86,9 @@ struct HexCoord {
     coord: Coord,
 }
 
+#[derive(Debug, Clone, Copy, Component)]
+struct Piece;
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -117,7 +120,7 @@ fn setup(
             let coord = Coord::new(q, r);
             let pixel = flat_hex_to_pixel(coord, RADIUS);
 
-            if let Ok(Piece { team, name, .. }) = game.board.get(coord) {
+            if let Ok(hex_chess_lib::Piece { team, name, .. }) = game.board.get(coord) {
                 let piece = commands
                     .spawn_bundle(SpriteSheetBundle {
                         sprite: TextureAtlasSprite {
@@ -129,6 +132,7 @@ fn setup(
                             .with_scale(Vec3::splat(0.8)),
                         ..default()
                     })
+                    .insert(Piece)
                     .id();
 
                 piece_sprites.insert(coord, piece);
@@ -160,10 +164,13 @@ fn screen_to_world(
 }
 
 fn piece_click_system(
+    mut commands: Commands,
     mut mouse_button_events: EventReader<MouseButtonInput>,
     wnds: Res<Windows>,
     q_camera: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
-    game: Res<Game>,
+    mut game: ResMut<Game>,
+    mut piece_sprites: ResMut<PieceSprites>,
+    mut q_piece_transforms: Query<&mut Transform, With<Piece>>,
     mut select: ResMut<SelectedHex>,
 ) {
     let (camera, camera_transform) = q_camera.single();
@@ -188,9 +195,28 @@ fn piece_click_system(
 
         for event in mouse_button_events.iter() {
             if event.button == MouseButton::Left && event.state == ButtonState::Pressed {
-                if let Ok(piece) = game.board.get(hex_pos) {
-                    if piece.team == game.turn {
-                        select.selected = Some(hex_pos);
+                if game.board.get(hex_pos).is_ok()
+                    && game.board.get(hex_pos).unwrap().team == game.turn
+                {
+                    select.selected = Some(hex_pos);
+                } else if let Some(from) = select.selected {
+                    match game.move_piece(from, hex_pos) {
+                        Ok(_) => {
+                            // move the piece sprite
+                            let entity = piece_sprites.remove(&from).unwrap();
+                            let mut transform = q_piece_transforms.get_mut(entity).unwrap();
+                            // delete the captured piece if there is one
+                            if let Some(_) = piece_sprites.get(&hex_pos) {
+                                let captured = piece_sprites.remove(&hex_pos).unwrap();
+                                commands.entity(captured).despawn();
+                            }
+                            transform.translation =
+                                flat_hex_to_pixel(hex_pos, RADIUS).extend(transform.translation.z);
+                            piece_sprites.insert(hex_pos, entity);
+
+                            select.selected = None;
+                        }
+                        Err(e) => eprintln!("{}", e),
                     }
                 }
             }

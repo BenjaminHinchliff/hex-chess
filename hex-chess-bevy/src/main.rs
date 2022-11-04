@@ -5,7 +5,7 @@ use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
     prelude::*,
     render::camera::RenderTarget,
-    sprite::{Material2d, MaterialMesh2dBundle, Mesh2dHandle},
+    sprite::MaterialMesh2dBundle,
     utils::HashMap,
 };
 use hex_chess_lib::{Coord, Game};

@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    ops::{Add, Div, Mul, Rem, Sub},
+    ops::{Add, Div, Mul, Sub},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -136,6 +136,15 @@ impl HexBoard {
             to,
         })?;
 
+        // is the destination in bounds?
+        if to.q.abs() > Self::N || to.r.abs() > Self::N || to.s().abs() > Self::N {
+            return Err(MoveError {
+                err_type: MoveErrorType::InvalidMove(*piece),
+                from,
+                to,
+            });
+        }
+
         // can the piece do that? can it capture or just move or both?
         let possible = piece.verify_move(from, to).ok_or_else(|| MoveError {
             err_type: MoveErrorType::InvalidMove(*piece),

@@ -6,11 +6,12 @@ use crate::hex_rect::{flat_hex_to_pixel, pixel_to_flat_hex};
 use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
     prelude::*,
-    render::camera::RenderTarget,
+    render::camera::{RenderTarget, ScalingMode},
     sprite::MaterialMesh2dBundle,
     utils::HashMap,
 };
 use bevy_easings::{Ease, EaseFunction, EaseMethod, EasingType, EasingsPlugin};
+use bevy_embedded_assets::EmbeddedAssetPlugin;
 use hex_chess_lib::{Coord, Game};
 
 const N: i32 = 5;
@@ -102,7 +103,16 @@ fn setup(
     mut piece_sprites: ResMut<PieceSprites>,
 ) {
     commands
-        .spawn_bundle(Camera2dBundle::default())
+        .spawn_bundle(Camera2dBundle {
+            projection: OrthographicProjection {
+                scaling_mode: ScalingMode::Auto {
+                    min_width: 900.0,
+                    min_height: 1000.0,
+                },
+                ..default()
+            },
+            ..default()
+        })
         .insert(MainCamera);
 
     let pieces_handle = asset_server.load("pieces/pieces.png");
@@ -251,7 +261,9 @@ fn main() {
             height: 1000.,
             ..default()
         })
-        .add_plugins(DefaultPlugins)
+        .add_plugins_with(DefaultPlugins, |group| {
+            group.add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin)
+        })
         .add_plugin(EasingsPlugin)
         .init_resource::<HexMaterials>()
         .init_resource::<PieceSprites>()

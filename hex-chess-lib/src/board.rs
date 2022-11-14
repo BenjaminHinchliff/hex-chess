@@ -132,6 +132,7 @@ impl HexBoard {
     }
 
     fn update_checkers(&mut self) {
+        return;
         let kings = self.pieces.iter().filter(|(_c, p)| p.name == Name::King);
         for (&pos, king) in kings {
             let mut checkers = Vec::new();

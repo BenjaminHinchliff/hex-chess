@@ -89,6 +89,14 @@ impl Mul<i32> for Coord {
     }
 }
 
+impl Mul<Coord> for Coord {
+    type Output = Self;
+
+    fn mul(self, rhs: Coord) -> Self::Output {
+        Self::new(self.q * rhs.q, self.r * rhs.r)
+    }
+}
+
 impl fmt::Display for Coord {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {}, {})", self.q, self.r, self.s())

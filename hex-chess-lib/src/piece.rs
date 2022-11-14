@@ -64,11 +64,11 @@ impl Name {
             Coord::new(-1, -1),
         ];
         let v = t - f;
-        for m in MOVEMENTS {
-            let f = v / *m;
+        for &m in MOVEMENTS {
+            let f = v / m;
             // check that the movement requested is a non-zero integer multiple of the movement
             // vector
-            if f.q != 0 && f.r != 0 && f.q == f.r {
+            if f.q == f.r && f * m == v {
                 return Some(MovesPossible {
                     _move: true,
                     capture: true,
@@ -131,7 +131,7 @@ impl fmt::Display for Name {
             f,
             "{}",
             match self {
-                Name::Pawn { .. } => "pawn",
+                Name::Pawn => "pawn",
                 Name::Bishop => "bishop",
                 Name::Rook => "rook",
                 Name::Knight => "knight",

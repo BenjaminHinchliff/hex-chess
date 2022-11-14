@@ -142,7 +142,7 @@ fn setup(
                     .with_children(|parent| {
                         parent.spawn_bundle(SpriteSheetBundle {
                             sprite: TextureAtlasSprite {
-                                index: ATLAS_SIZE.0 * *team as usize + name.idx() as usize,
+                                index: ATLAS_SIZE.0 * *team as usize + *name as usize,
                                 ..default()
                             },
                             texture_atlas: pieces_atlas_handle.clone(),

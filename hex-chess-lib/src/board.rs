@@ -16,15 +16,15 @@ const STARTING_PIECES: &[(Coord, Piece)] = &[
     (Coord::new(2, -5), Piece::new(Name::Knight, Team::White)),
     (Coord::new(-3, -2), Piece::new(Name::Rook, Team::White)),
     (Coord::new(3, -5), Piece::new(Name::Rook, Team::White)),
-    (Coord::new(4, -5), Piece::new(Name::pawn(), Team::White)),
-    (Coord::new(3, -4), Piece::new(Name::pawn(), Team::White)),
-    (Coord::new(2, -3), Piece::new(Name::pawn(), Team::White)),
-    (Coord::new(1, -2), Piece::new(Name::pawn(), Team::White)),
-    (Coord::new(0, -1), Piece::new(Name::pawn(), Team::White)),
-    (Coord::new(-1, -1), Piece::new(Name::pawn(), Team::White)),
-    (Coord::new(-2, -1), Piece::new(Name::pawn(), Team::White)),
-    (Coord::new(-3, -1), Piece::new(Name::pawn(), Team::White)),
-    (Coord::new(-4, -1), Piece::new(Name::pawn(), Team::White)),
+    (Coord::new(4, -5), Piece::new(Name::Pawn, Team::White)),
+    (Coord::new(3, -4), Piece::new(Name::Pawn, Team::White)),
+    (Coord::new(2, -3), Piece::new(Name::Pawn, Team::White)),
+    (Coord::new(1, -2), Piece::new(Name::Pawn, Team::White)),
+    (Coord::new(0, -1), Piece::new(Name::Pawn, Team::White)),
+    (Coord::new(-1, -1), Piece::new(Name::Pawn, Team::White)),
+    (Coord::new(-2, -1), Piece::new(Name::Pawn, Team::White)),
+    (Coord::new(-3, -1), Piece::new(Name::Pawn, Team::White)),
+    (Coord::new(-4, -1), Piece::new(Name::Pawn, Team::White)),
 ];
 
 fn reflect_team<'a>(pieces: impl Iterator<Item = Hex> + 'a) -> impl Iterator<Item = Hex> + 'a {
@@ -129,7 +129,7 @@ impl HexBoard {
         false
     }
 
-    pub fn move_piece(&mut self, from: Coord, to: Coord) -> Result<(), MoveError> {
+    pub fn can_move(&mut self, from: Coord, to: Coord) -> Result<(), MoveError> {
         let piece = self.get(from).map_err(|e| MoveError {
             err_type: e.into(),
             from,
@@ -176,8 +176,13 @@ impl HexBoard {
             });
         }
 
-        let mut piece = self.pieces.remove(&from).unwrap();
-        piece.mark_moved();
+        Ok(())
+    }
+
+    pub fn move_piece(&mut self, from: Coord, to: Coord) -> Result<(), MoveError> {
+        self.can_move(from, to)?;
+
+        let piece = self.pieces.remove(&from).unwrap();
         self.pieces.insert(to, piece);
 
         Ok(())
@@ -275,18 +280,18 @@ mod tests {
     #[test]
     fn move_pawn() {
         let mut board = HexBoard::new();
-        let pawn = Piece::new(Name::pawn(), Team::White);
+        let pawn = Piece::new(Name::Pawn, Team::White);
         board.place((0, -2).into(), pawn.clone());
         board.place((-1, -1).into(), pawn);
-        board.place((1, 1).into(), Piece::new(Name::pawn(), Team::Black));
+        board.place((1, 1).into(), Piece::new(Name::Pawn, Team::Black));
 
         // move one
         check_move(
             &mut board,
             (0, -2).into(),
             (0, -1).into(),
-            Piece::new(Name::pawn(), Team::White),
-            Piece::new(Name::Pawn { has_moved: true }, Team::White),
+            Piece::new(Name::Pawn, Team::White),
+            Piece::new(Name::Pawn, Team::White),
         );
 
         // move 2
@@ -294,8 +299,8 @@ mod tests {
             &mut board,
             (-1, -1).into(),
             (-1, 1).into(),
-            Piece::new(Name::pawn(), Team::White),
-            Piece::new(Name::Pawn { has_moved: true }, Team::White),
+            Piece::new(Name::Pawn, Team::White),
+            Piece::new(Name::Pawn, Team::White),
         );
 
         // move 3 fails
@@ -303,12 +308,9 @@ mod tests {
             &mut board,
             (-1, 1).into(),
             (-1, 3).into(),
-            Some(Piece::new(Name::Pawn { has_moved: true }, Team::White)),
+            Some(Piece::new(Name::Pawn, Team::White)),
             MoveError {
-                err_type: MoveErrorType::InvalidMove(Piece::new(
-                    Name::Pawn { has_moved: true },
-                    Team::White,
-                )),
+                err_type: MoveErrorType::InvalidMove(Piece::new(Name::Pawn, Team::White)),
                 from: (-1, 1).into(),
                 to: (-1, 3).into(),
             },
@@ -319,12 +321,9 @@ mod tests {
             &mut board,
             (-1, 1).into(),
             (0, 1).into(),
-            Some(Piece::new(Name::Pawn { has_moved: true }, Team::White)),
+            Some(Piece::new(Name::Pawn, Team::White)),
             MoveError {
-                err_type: MoveErrorType::InvalidMove(Piece::new(
-                    Name::Pawn { has_moved: true },
-                    Team::White,
-                )),
+                err_type: MoveErrorType::InvalidMove(Piece::new(Name::Pawn, Team::White)),
                 from: (-1, 1).into(),
                 to: (0, 1).into(),
             },
@@ -335,8 +334,8 @@ mod tests {
             &mut board,
             (1, 1).into(),
             (1, -1).into(),
-            Piece::new(Name::pawn(), Team::Black),
-            Piece::new(Name::Pawn { has_moved: true }, Team::Black),
+            Piece::new(Name::Pawn, Team::Black),
+            Piece::new(Name::Pawn, Team::Black),
         );
 
         // capture
@@ -344,8 +343,8 @@ mod tests {
             &mut board,
             (0, -1).into(),
             (1, -1).into(),
-            Piece::new(Name::Pawn { has_moved: true }, Team::White),
-            Piece::new(Name::Pawn { has_moved: true }, Team::White),
+            Piece::new(Name::Pawn, Team::White),
+            Piece::new(Name::Pawn, Team::White),
         )
     }
 

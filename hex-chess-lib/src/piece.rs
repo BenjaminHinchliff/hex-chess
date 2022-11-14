@@ -1,7 +1,7 @@
-use num_derive::ToPrimitive;
-
 use crate::coord::Coord;
-use std::fmt;
+use num_derive::ToPrimitive;
+use once_cell::sync::OnceCell;
+use std::{collections::HashSet, fmt};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MovesPossible {
@@ -9,24 +9,37 @@ pub struct MovesPossible {
     pub capture: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+static PAWN_DOUBLES: OnceCell<HashSet<Coord>> = OnceCell::new();
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToPrimitive)]
 pub enum Name {
     King,
     Queen,
     Bishop,
     Knight,
     Rook,
-    Pawn { has_moved: bool },
+    Pawn,
 }
 
 impl Name {
-    pub const fn pawn() -> Name {
-        Name::Pawn { has_moved: false }
-    }
-
-    fn verify_pawn(&self, has_moved: bool, f: Coord, t: Coord) -> Option<MovesPossible> {
+    fn verify_pawn(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
+        let doubles = PAWN_DOUBLES.get_or_init(|| {
+            let mut doubles = HashSet::new();
+            doubles.extend(&[
+                Coord::new(-4, 1),
+                Coord::new(-3, 1),
+                Coord::new(-2, 1),
+                Coord::new(-1, 1),
+                Coord::new(0, 1),
+                Coord::new(1, 0),
+                Coord::new(1, -1),
+                Coord::new(1, -2),
+                Coord::new(1, -3),
+            ]);
+            doubles
+        });
         // check trying to move one space forward, or two spaces forward
-        if f.q == t.q && (f.r + 1 == t.r || (!has_moved && f.r + 2 == t.r)) {
+        if f.q == t.q && (f.r + 1 == t.r || (doubles.contains(&t) && f.r + 2 == t.r)) {
             Some(MovesPossible {
                 _move: true,
                 capture: false,
@@ -102,7 +115,7 @@ impl Name {
 
     pub fn verify_move(&self, f: Coord, t: Coord) -> Option<MovesPossible> {
         match self {
-            Name::Pawn { has_moved } => self.verify_pawn(*has_moved, f, t),
+            Name::Pawn => self.verify_pawn(f, t),
             Name::Bishop => self.verify_bishop(f, t),
             Name::Rook => self.verify_rook(f, t),
             Name::Knight => self.verify_knight(f, t),
@@ -110,24 +123,6 @@ impl Name {
             Name::King => self.verify_king(f, t),
         }
     }
-
-    pub const fn idx(&self) -> u8 {
-        match self {
-            Name::King => 0,
-            Name::Queen => 1,
-            Name::Bishop => 2,
-            Name::Knight => 3,
-            Name::Rook => 4,
-            Name::Pawn { .. } => 5,
-        }
-    }
-
-    // pub const fn moves(&self) -> &[(i32, i32)] {
-    //     match self {
-    //         Name::Pawn { has_moved } => &[(1, 0)],
-    //         _ => unimplemented!(),
-    //     }
-    // }
 }
 
 impl fmt::Display for Name {
@@ -198,12 +193,6 @@ impl Piece {
         }
 
         self.name.verify_move(f, t)
-    }
-
-    pub fn mark_moved(&mut self) {
-        if let Name::Pawn { has_moved } = &mut self.name {
-            *has_moved = true
-        }
     }
 }
 

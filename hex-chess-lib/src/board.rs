@@ -73,6 +73,7 @@ pub enum GetError {
 #[derive(Debug, Clone)]
 pub struct HexBoard {
     pieces: HashMap<Coord, Piece>,
+    checkers: [Vec<Coord>; 2],
 }
 
 impl HexBoard {
@@ -81,6 +82,7 @@ impl HexBoard {
     pub fn new() -> HexBoard {
         HexBoard {
             pieces: HashMap::new(),
+            checkers: Default::default(),
         }
     }
 
@@ -129,13 +131,59 @@ impl HexBoard {
         false
     }
 
-    pub fn can_move(&mut self, from: Coord, to: Coord) -> Result<(), MoveError> {
+    fn update_checkers(&mut self) {
+        let kings = self.pieces.iter().filter(|(_c, p)| p.name == Name::King);
+        for (&pos, king) in kings {
+            let mut checkers = Vec::new();
+            let enemy_coords = self
+                .pieces
+                .iter()
+                .filter(|(c, p)| p.team == king.team.flip());
+            for (&enemy_pos, enemy) in enemy_coords {
+                if self.unchecked_can_move(enemy, enemy_pos, pos).is_ok() {
+                    checkers.push(pos);
+                }
+            }
+            self.checkers[king.team as usize] = checkers;
+        }
+    }
+
+    const ADJACENTS: &[Coord] = &[
+        Coord::new(1, 0),
+        Coord::new(1, -1),
+        Coord::new(0, -1),
+        Coord::new(-1, 0),
+        Coord::new(-1, 1),
+        Coord::new(0, 1),
+    ];
+
+    pub fn can_move(&self, from: Coord, to: Coord) -> Result<(), MoveError> {
         let piece = self.get(from).map_err(|e| MoveError {
             err_type: e.into(),
             from,
             to,
         })?;
 
+        if self.checkers[piece.team as usize].is_empty() {
+            self.unchecked_can_move(piece, from, to)
+        } else {
+            // are we out of check after the move?
+            let mut projected = self.clone();
+            projected.teleport(from, to);
+            projected.update_checkers();
+            if projected.checkers[piece.team as usize].is_empty() {
+                Ok(())
+            } else {
+                Err(MoveError {
+                    err_type: MoveErrorType::InvalidMove(*piece),
+                    from,
+                    to,
+                })
+            }
+        }
+    }
+
+    fn unchecked_can_move(&self, piece: &Piece, from: Coord, to: Coord) -> Result<(), MoveError> {
         // is the destination in bounds?
         if to.q.abs() > Self::N || to.r.abs() > Self::N || to.s().abs() > Self::N {
             return Err(MoveError {
@@ -182,10 +230,15 @@ impl HexBoard {
     pub fn move_piece(&mut self, from: Coord, to: Coord) -> Result<(), MoveError> {
         self.can_move(from, to)?;
 
+        self.teleport(from, to);
+
+        self.update_checkers();
+        Ok(())
+    }
+
+    fn teleport(&mut self, from: Coord, to: Coord) {
         let piece = self.pieces.remove(&from).unwrap();
         self.pieces.insert(to, piece);
-
-        Ok(())
     }
 }
 

@@ -218,33 +218,37 @@ fn piece_click_system(
                 {
                     select.selected = Some(hex_pos);
                 } else if let Some(from) = select.selected {
-                    match game.move_piece(from, hex_pos) {
-                        Ok(_) => {
-                            // move the piece sprite
-                            let entity = piece_sprites.remove(&from).unwrap();
-                            let transform = q_piece_transforms.get_mut(entity).unwrap();
-                            // delete the captured piece if there is one
-                            if let Some(_) = piece_sprites.get(&hex_pos) {
-                                let captured = piece_sprites.remove(&hex_pos).unwrap();
-                                commands.entity(captured).despawn_recursive();
-                            }
-                            commands.entity(entity).insert(
-                                transform.ease_to(
-                                    Transform::from_translation(
-                                        flat_hex_to_pixel(hex_pos, RADIUS)
-                                            .extend(transform.translation.z),
+                    if !game.finished() {
+                        match game.move_piece(from, hex_pos) {
+                            Ok(_) => {
+                                // move the piece sprite
+                                let entity = piece_sprites.remove(&from).unwrap();
+                                let transform = q_piece_transforms.get_mut(entity).unwrap();
+                                // delete the captured piece if there is one
+                                if let Some(_) = piece_sprites.get(&hex_pos) {
+                                    let captured = piece_sprites.remove(&hex_pos).unwrap();
+                                    commands.entity(captured).despawn_recursive();
+                                }
+                                commands.entity(entity).insert(
+                                    transform.ease_to(
+                                        Transform::from_translation(
+                                            flat_hex_to_pixel(hex_pos, RADIUS)
+                                                .extend(transform.translation.z),
+                                        ),
+                                        EaseMethod::EaseFunction(EaseFunction::QuadraticOut),
+                                        EasingType::Once {
+                                            duration: Duration::from_millis(200),
+                                        },
                                     ),
-                                    EaseMethod::EaseFunction(EaseFunction::QuadraticOut),
-                                    EasingType::Once {
-                                        duration: Duration::from_millis(200),
-                                    },
-                                ),
-                            );
-                            piece_sprites.insert(hex_pos, entity);
+                                );
+                                piece_sprites.insert(hex_pos, entity);
 
-                            select.selected = None;
+                                select.selected = None;
+                            }
+                            Err(e) => eprintln!("{}", e),
                         }
-                        Err(e) => eprintln!("{}", e),
+                    } else {
+                        eprintln!("game already finished - won by {}", game.turn.flip());
                     }
                 }
             }

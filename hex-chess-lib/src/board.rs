@@ -106,7 +106,7 @@ impl HexBoard {
         self.pieces.get(&c).ok_or_else(|| GetError::NoPiece(c))
     }
 
-    fn collides(&self, f: Coord, t: Coord) -> bool {
+    fn between(f: Coord, t: Coord) -> impl Iterator<Item = Coord> {
         let v = t - f;
         // movement along an axis
         let (axial_len, uv) = if v.is_axis() {
@@ -121,10 +121,23 @@ impl HexBoard {
             (axial_len, uv)
         };
 
+        let mut n = 1;
+        std::iter::from_fn(move || {
+            let cell = if n < axial_len {
+                Some(f + uv * n)
+            } else {
+                None
+            };
+
+            n += 1;
+            cell
+        })
+    }
+
+    fn collides(&self, f: Coord, t: Coord) -> bool {
         // never inclusive
-        for n in 1..axial_len {
-            let vn = f + uv * n;
-            if self.pieces.contains_key(&vn) {
+        for cell in Self::between(f, t) {
+            if self.pieces.contains_key(&cell) {
                 return true;
             }
         }
@@ -132,14 +145,13 @@ impl HexBoard {
     }
 
     fn update_checkers(&mut self) {
-        return;
         let kings = self.pieces.iter().filter(|(_c, p)| p.name == Name::King);
         for (&pos, king) in kings {
             let mut checkers = Vec::new();
             let enemy_coords = self
                 .pieces
                 .iter()
-                .filter(|(c, p)| p.team == king.team.flip());
+                .filter(|(_c, p)| p.team == king.team.flip());
             for (&enemy_pos, enemy) in enemy_coords {
                 if self.unchecked_can_move(enemy, enemy_pos, pos).is_ok() {
                     checkers.push(pos);
@@ -157,6 +169,45 @@ impl HexBoard {
         Coord::new(-1, 1),
         Coord::new(0, 1),
     ];
+
+    pub fn is_checkmated(&self, team: Team) -> bool {
+        let checkers = &self.checkers[team as usize];
+        if checkers.is_empty() {
+            return false;
+        }
+
+        let (&coord, king) = self
+            .pieces
+            .iter()
+            .find(|(_c, p)| p.name == Name::King && p.team == team)
+            .unwrap();
+
+        // can the king move out of check?
+        let mut projected = self.clone();
+        for &adjacent in Self::ADJACENTS {
+            let target = coord + adjacent;
+            if projected.unchecked_can_move(king, coord, target).is_ok() {
+                projected.teleport(coord, target);
+                projected.update_checkers();
+                if projected.checkers[team as usize].is_empty() {
+                    return false;
+                }
+            }
+        }
+
+        // // can another piece block check?
+        // for &checker in checkers {
+        //     for (&e_coord, enemy) in self.pieces.iter() {
+        //         for between in Self::between(coord, checker) {
+        //             if self.unchecked_can_move(enemy, e_coord, between).is_ok() {
+        //                 return false;
+        //             }
+        //         }
+        //     }
+        // }
+
+        true
+    }
 
     pub fn can_move(&self, from: Coord, to: Coord) -> Result<(), MoveError> {
         let piece = self.get(from).map_err(|e| MoveError {

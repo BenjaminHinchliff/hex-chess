@@ -18,6 +18,7 @@ pub enum GameError {
 pub struct Game {
     pub turn: Team,
     pub board: HexBoard,
+    finished: bool,
 }
 
 impl Game {
@@ -25,6 +26,7 @@ impl Game {
         Self {
             turn: Team::White,
             board: HexBoard::new_initialize(),
+            finished: false,
         }
     }
 
@@ -37,8 +39,13 @@ impl Game {
             });
         }
         self.board.move_piece(from, to)?;
+        self.finished = self.board.is_checkmated(self.turn.flip());
         self.turn = self.turn.flip();
         Ok(())
+    }
+
+    pub fn finished(&self) -> bool {
+        self.finished
     }
 }
 
